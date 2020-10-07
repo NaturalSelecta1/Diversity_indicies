@@ -8,16 +8,16 @@
 #
 
 rm(list=ls()) #Clear R
-
 library(shiny)
 library(tidyverse)
 library(shinythemes)
+library(plotly)
 
 sample_data<-read.csv("Plant_Biota.csv",header=T,stringsAsFactors = T)
 sample_data2<-pivot_longer(sample_data,cols=c("shannon","simpson","insimpson"))%>%rename("Index"="name","alpha"="value")
 sample_data3<-pivot_longer(sample_data2,cols=c("Site","Genotype","Type"))%>%rename("Group"="name","level"="value")
 
-a<-
+
 
 ui <- navbarPage("Diversity of Plant\nmicrobiota",
                theme=shinytheme('united'),
@@ -35,7 +35,7 @@ ui <- navbarPage("Diversity of Plant\nmicrobiota",
                                    br(),
                                    br(),
                                    ),
-                          tabPanel("Alpha", strong("Metrics of Alpha Diversity"),
+                          tabPanel(width=4,"Alpha", strong("Metrics of Alpha Diversity"),
                           sidebarLayout(position="left",
                                         sidebarPanel(width=4,
                                             selectInput(
@@ -54,11 +54,26 @@ ui <- navbarPage("Diversity of Plant\nmicrobiota",
                                                      selectInput("group2",
                                                                   "Select groups to compare:",
                                                                   choices=c("Site","Genotype","Type"))),
-                                                 mainPanel(width=5,plotOutput("betaplot"))))),
+                                                 mainPanel(width=5,plotOutput("betaplot")))),
+                          tabPanel(width=4,"Correlations", strong("Correlating metrics of alpha diversity"),
+                                   sidebarLayout(position="left",
+                                                 sidebarPanel(
+                                                     varSelectInput("metric_x",
+                                                                 "Select x-axis metric:",
+                                                                 selected="simpson",
+                                                                 sample_data%>%select(shannon,simpson,insimpson)),
+                                                     varSelectInput("metric_y",
+                                                                    "Select y-axis metric:",
+                                                                    selected="shannon",
+                                                                    sample_data%>%select(shannon,simpson,insimpson)),
+                                                     varSelectInput("col_by",
+                                                                    "Select grouping:",
+                                                                    sample_data%>%select(Type,Genotype,Site))),
+                                                 mainPanel(width=5,plotlyOutput("corr_plot"))))),
                img(src="design.png",width="300px"),
                img(src="plant.jpg",width="300px",height="400px")
                )
-
+?varSelectInput
 server <- function(input, output, session) {
     dataset <- reactive({
         filter(sample_data3,Index==input$index&Group==input$group)
@@ -86,6 +101,15 @@ server <- function(input, output, session) {
                   axis.title = element_text(size=15))+
             scale_color_discrete("Grouping")+
             ggtitle(paste("Beta Diversity","-","Bray-Curtis"))
+    )
+    output$corr_plot<-renderPlotly(ggplotly(
+        ggplot(data=sample_data, aes(x = !!input$metric_x, y = !!input$metric_y, color = !!input$col_by)) +
+            geom_point(size=3,alpha=.5)+
+            theme_bw()+
+            theme(legend.position = "right",
+                  axis.text = element_text(size=15),
+                  axis.title = element_text(size=15))+
+            scale_color_discrete("Grouping"))
     )
 }
 
